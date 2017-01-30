@@ -178,111 +178,158 @@ int main()
 
 	glUseProgram(shaderProgram);
 
-
+	//Reading vertices from from a file
 	ifstream input;
-	input.open("translational_5x5_grid.txt");
+	input.open("input_a1.txt");
 	int curveType;
-	int numLines;
+	int numPoints;
 	string line;
 	input >> curveType;
 	cout << curveType <<endl;
-	getline(input, line);
-	input >> numLines;
-	cout << numLines << endl;
+	
+	
 	float x = 0;
 	float y = 0;
 	float z = 0;
+
+	//the two vector curves
 	vector < glm::vec3*>* profile = new vector<glm::vec3*>;
-	getline(input, line);
-	for (int i = 0; i < numLines; i++)
-	{
-		input >> x;
-		input >> y;
-		input >> z;
-		profile->push_back(new glm::vec3(x, y, z));
-		cout << x << ", " << y << ", " << z << std::endl;
-		getline(input, line);
-	}
-	int numLines2;
-	input >> numLines2;
 	vector < glm::vec3*>* trajectory = new vector<glm::vec3*>;
-	for (int i = 0; i < numLines2; i++)
+
+	GLfloat* vertices2;
+	
+	int indexSize;
+	int *indices;
+	int size;
+
+	//If curveType==0 then it is a translational curve
+	if (curveType == 0)
 	{
-		input >> x;
-		input >> y;
-		input >> z;
-		trajectory->push_back(new glm::vec3(x, y, z));
-		cout << x << ", " << y << ", " << z << std::endl;
+		//Gets te numbwe or rows and skips lines
 		getline(input, line);
-	}
+		input >> numPoints;
+		cout << numPoints << endl;
+		getline(input, line);
 
-	int size = profile->size()*trajectory->size() * 6;
-	GLfloat* vertices2 = new GLfloat[size];
-
-	int pos = 0;
-	int indexEBO = 0;
-	int indexSize = (profile->size() - 1)*(trajectory->size() - 1) * 3 * 2;
-	int *indices = new int[indexSize];
-
-
-	for (int i = 0; i < profile->size(); i++)
-	{
-		for (int k = 0; k < trajectory->size(); k++)
+		//Getting profile the actual data
+		for (int i = 0; i < numPoints; i++)
 		{
-			float height = (float(i) / float(profile->size()));
+			input >> x;
+			input >> y;
+			input >> z;
+			profile->push_back(new glm::vec3(x, y, z));
+			cout << x << ", " << y << ", " << z << std::endl;
+			getline(input, line);
+		}
+		//Getting the trajectory data
+		int numPoints2;
+		input >> numPoints2;
+		
+		for (int i = 0; i < numPoints2; i++)
+		{
+			input >> x;
+			input >> y;
+			input >> z;
+			trajectory->push_back(new glm::vec3(x, y, z));
+			cout << x << ", " << y << ", " << z << std::endl;
+			getline(input, line);
+		}
 
-			vertices2[pos] = profile->at(i)->x + trajectory->at(k)->x;
-			vertices2[pos + 1] = profile->at(i)->y + trajectory->at(k)->y;
-			vertices2[pos + 2] = profile->at(i)->z + trajectory->at(k)->z;
-			vertices2[pos + 3] = height;
-			vertices2[pos + 4] = height;
-			vertices2[pos + 5] = 0;
-			pos += 6;
+		//Size, which is the profile vector size times the trajectory vect size times 6 
+		 size = profile->size()*trajectory->size() * 6;
+		 vertices2 = new GLfloat[size];
 
-			if (i > 0 && k > 0)
+		//A position which we will need to keep for the indices
+		int pos = 0;
+		int indexEBO = 0;
+		/////////////////////////////////////////////////////////////////////
+		 indexSize = (profile->size() - 1)*(trajectory->size() - 1) * 3 * 2;
+		 indices = new int[indexSize];
+
+		//Translating the profile and trajectory vertices
+		for (int i = 0; i < profile->size(); i++)
+		{
+			for (int k = 0; k < trajectory->size(); k++)
 			{
+				float height = (float(i) / float(profile->size()));
 
-				indices[indexEBO] = pos / 6 - 1;
-				indices[indexEBO + 1] = pos / 6 - 1 - 1;
-				indices[indexEBO + 2] = pos / 6 - trajectory->size() - 2;
+				vertices2[pos] = profile->at(i)->x + trajectory->at(k)->x;
+				vertices2[pos + 1] = profile->at(i)->y + trajectory->at(k)->y;
+				vertices2[pos + 2] = profile->at(i)->z + trajectory->at(k)->z;
+				vertices2[pos + 3] = height;
+				vertices2[pos + 4] = height;
+				vertices2[pos + 5] = 0;
+				pos += 6;
 
-				indices[indexEBO + 3] = pos / 6 - 1;
-				indices[indexEBO + 4] = pos / 6 - trajectory->size() - 1;
-				indices[indexEBO + 5] = pos / 6 - trajectory->size() - 2;
+				//If we are after the first iteration of i and k, then it means we are ontop.
+				//We must now take the indices for the EBO in order to draw the triangles
+				if (i > 0 && k > 0)
+				{
+					//Getting the indices for the EBO
+					indices[indexEBO] = pos / 6 - 1;
+					indices[indexEBO + 1] = pos / 6 - 1 - 1;
+					indices[indexEBO + 2] = pos / 6 - trajectory->size() - 2;
 
-				indexEBO += 6;
+					indices[indexEBO + 3] = pos / 6 - 1;
+					indices[indexEBO + 4] = pos / 6 - trajectory->size() - 1;
+					indices[indexEBO + 5] = pos / 6 - trajectory->size() - 2;
+
+					indexEBO += 6;
+				}
+			}
+
+		}
+		cout << "\nEBO size: " << indexSize << " VBO size: " << size << endl;
+
+		//TESTING
+		int c = 0;
+		for (int i = 0; i < size; i++)
+		{
+			printf("%f ", vertices2[i]);
+			c++;
+			if (c > 2)
+			{
+				c = 0;
+				std::cout << std::endl;
+			}
+		}
+		c = 0;
+		std::cout << "Indices " << indexSize << std::endl;
+		for (int i = 0; i < indexSize; i++)
+		{
+			printf("%d ", indices[i]);
+			c++;
+			if (c > 2)
+			{
+				c = 0;
+				std::cout << std::endl;
 			}
 		}
 
-	}
-	cout << "\nEBO size: " << indexSize << " VBO size: " << size << endl;
 
-	//TESTING
-	int c = 0;
-	for (int i = 0; i < size; i++)
+	}
+
+	//Else, if this is a rotational curve
+	else if (curveType != 0)
 	{
-		printf("%f ", vertices2[i]);
-		c++;
-		if (c > 2)
+		int spans = 0;
+	
+		input >> spans;
+		getline(input, line);
+		input >> numPoints;
+		//Getting profile the actual data
+		for (int i = 0; i < numPoints; i++)
 		{
-			c = 0;
-			std::cout << std::endl;
+			input >> x;
+			input >> y;
+			input >> z;
+			profile->push_back(new glm::vec3(x, y, z));
+			cout << x << ", " << y << ", " << z << std::endl;
+			getline(input, line);
 		}
-	}
-	c = 0;
-	std::cout << "Indices " << indexSize << std::endl;
-	for (int i = 0; i < indexSize; i++)
-	{
-		printf("%d ", indices[i]);
-		c++;
-		if (c > 2)
-		{
-			c = 0;
-			std::cout << std::endl;
-		}
-	}
 
-
+	}
+	
 
 	GLuint VAO, VBO, EBO;
 	glGenVertexArrays(1, &VAO);
