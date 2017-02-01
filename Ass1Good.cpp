@@ -19,14 +19,26 @@
 using namespace std;
 
 // Window dimensions
-const GLuint WIDTH = 800, HEIGHT = 600;
+const GLuint WIDTH = 800, HEIGHT = 800;
 
 glm::vec3 triangle_scale;
 glm::vec3 camera_translation = glm::vec3(0.0f, 0.0f, -1.0f);
 
+float rotation = 9.0;
+glm::mat4 model_matrix;
+glm::mat4 view_matrix;
+
+
 const float TRIANGLE_MOVEMENT_STEP = 0.1f;
 const float CAMERA_PAN_STEP = 0.2f;
 
+GLfloat radius = 10.0f;
+GLfloat camX = sin(glfwGetTime()) * radius;
+GLfloat camZ = cos(glfwGetTime()) * radius;
+glm::mat4 view;
+//view_matrix = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+float valx= 10.0;
+float valy = 10.0;
 // Is called whenever a key is pressed/released via GLFW
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
@@ -35,17 +47,16 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		glfwSetWindowShouldClose(window, GL_TRUE);
 
 	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
-		triangle_scale.x += TRIANGLE_MOVEMENT_STEP;
+		valx-=10;
 
 	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
-		triangle_scale.x -= TRIANGLE_MOVEMENT_STEP;
+		valx+=10;
 
 	if (key == GLFW_KEY_UP && action == GLFW_PRESS)
-		triangle_scale.y += TRIANGLE_MOVEMENT_STEP;
+		valy+= 10;;
 
 	if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
-		triangle_scale.y -= TRIANGLE_MOVEMENT_STEP;
-
+		valy-= 10;
 	if (key == GLFW_KEY_D && action == GLFW_PRESS)
 		camera_translation.x += CAMERA_PAN_STEP;
 
@@ -57,6 +68,24 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 	if (key == GLFW_KEY_W && action == GLFW_PRESS)
 		camera_translation.y += CAMERA_PAN_STEP;
+
+	if (key == GLFW_KEY_P && action == GLFW_PRESS)
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+	if (key == GLFW_KEY_R && action == GLFW_PRESS)
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	//model_matrix = glm::scale(model_matrix, triangle_scale);
+
+	if (key == GLFW_KEY_O && action == GLFW_PRESS)
+	{
+		glPointSize(10);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+
+	}
+	
+	
+	
 }
 
 // The MAIN function, from here we start the application and run the game loop
@@ -98,7 +127,6 @@ int main()
 
 	glViewport(0, 0, width, height);
 
-	//glEnable(GL_DEPTH_TEST);
 
 	// Build and compile our shader program
 	// Vertex shader
@@ -321,16 +349,106 @@ int main()
 		for (int i = 0; i < numPoints; i++)
 		{
 			input >> x;
-			input >> y;
-			input >> z;
+			input >> z;//cuz they messed up
+			input >> y;//cuz they messed up
 			profile->push_back(new glm::vec3(x, y, z));
 			cout << x << ", " << y << ", " << z << std::endl;
 			getline(input, line);
 		}
 
-	}
-	
+		glm::mat4x4 rotation = glm::mat4(1.0f);
 
+		 size = profile->size() *spans * 6;
+		 indexSize = (profile->size() - 1)*(spans) * 6;
+		 int pos = 0;
+		 int indexEBO = 0;
+		 vertices2 = new GLfloat[size];
+		 indices = new int[ indexSize];
+
+		for (int i = 0; i < spans; i++)
+		{
+			for (int k = 0; k < numPoints; k++)
+			{
+				glm::vec4 profile2 = glm::vec4(*profile->at(k), 1.0);
+				glm::vec4 finalVec = profile2 * glm::rotate(rotation, glm::radians(360.0f / (float)spans)*i, glm::vec3(0, 1, 0));
+
+				float height = (float(i) / float(profile->size()));
+
+				vertices2[pos] = finalVec.x;
+				vertices2[pos + 1] = finalVec.y;
+				vertices2[pos + 2] = finalVec.z;
+				vertices2[pos + 3] = height;
+				vertices2[pos + 4] = height;
+				vertices2[pos + 5] = 0;
+				pos += 6;
+
+				//If we are after the first iteration of i and k, then it means we are ontop.
+				//We must now take the indices for the EBO in order to draw the triangles
+				if (i > 0 && k > 0)
+				{
+					//Getting the indices for the EBO
+					indices[indexEBO] = pos / 6 - 1;
+					indices[indexEBO + 1] = pos / 6 - 1 - 1;
+					indices[indexEBO + 2] = pos / 6 - profile->size() - 2;
+
+					indices[indexEBO + 3] = pos / 6 - 1;
+					indices[indexEBO + 4] = pos / 6 - profile->size() - 1;
+					indices[indexEBO + 5] = pos / 6 - profile->size() - 2;
+
+					indexEBO += 6;
+				}
+				else if (k > 0) 
+				{
+					indices[indexEBO] = pos / 6 - 1;
+					indices[indexEBO + 1] = pos / 6 - 1 - 1;
+					indices[indexEBO + 2] = size / 6 - profile->size()+pos/6 - 2;
+
+					indices[indexEBO + 3] = pos / 6 - 1;
+					indices[indexEBO + 4] = size / 6 - profile->size()+pos/6 - 1;
+					indices[indexEBO + 5] = size / 6 - profile->size()+pos/6 - 2;
+
+					indexEBO += 6;
+
+				}
+			}
+				
+			
+
+
+		}
+		
+	}
+
+
+
+
+	//CameraStuff
+	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+	glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+	//We need this one
+	glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
+
+	//Do cross product in order to get the right vector
+	//Cross between up and camearadirection
+	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+	//Good one we need
+	glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection));
+	
+	//Cross between cameraDir and camright
+	//Another one we need
+	glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
+	
+	glm::mat4 view;
+	view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f),
+						glm::vec3(0.0f, 0.0f, 0.0f),
+						glm::vec3(0.0f, 1.0f, 0.0f));
+
+
+
+
+
+
+	//VAO, VBO, and EBO stuff
 	GLuint VAO, VBO, EBO;
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
@@ -379,15 +497,17 @@ int main()
 		
 		glm::mat4 model_matrix;
 		model_matrix = glm::scale(model_matrix, triangle_scale);
-		model_matrix = glm::rotate(model_matrix, glm::radians(rotation), glm::vec3(1, 0, 0));
-		model_matrix = glm::rotate(model_matrix, glm::radians(rotation), glm::vec3(0, 1, 0));
-		model_matrix = glm::rotate(model_matrix, glm::radians(rotation), glm::vec3(0, 0, 1));
-		rotation++;
+		model_matrix = glm::rotate(model_matrix, glm::radians(valx), glm::vec3(1, 0, 0));
+		model_matrix = glm::rotate(model_matrix, glm::radians(valy), glm::vec3(0, 1, 0));
+		model_matrix = glm::rotate(model_matrix, glm::radians(z), glm::vec3(0, 0, 1));
+		//rotation++;
 
-		glm::mat4 view_matrix;
-		view_matrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), //camera positioned here
-			glm::vec3(0.0f, 0.0f, 0.0f), //looks at origin
-			glm::vec3(0.0f, 1.0f, 0.0f)); //up vector
+		;
+
+		view_matrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), //camera positioned here
+									glm::vec3(0.0f, 0.0f, 0.0f), //looks at origin
+									glm::vec3(0.0f, rotation, 0.0f)); //up vector
+		rotation++;
 
 		glm::mat4 projection_matrix;
 		projection_matrix = glm::perspective(45.0f, (GLfloat)width / (GLfloat)height, 0.0f, 100.0f);
